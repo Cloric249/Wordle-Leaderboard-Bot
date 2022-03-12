@@ -1,6 +1,5 @@
-import requests
+from asyncio.windows_events import NULL
 import DBManager
-import pyodbc
 from decouple import config
 import discord 
 from discord.ext import commands
@@ -39,31 +38,43 @@ async def leaderboard(ctx):
         return
     
     messages = await channel.history(limit=None).flatten()
-    parseMsgs(messages)
+   
+    numOfGames = parseMsgs(messages, players)
 
     update_table()
     global updated
     updated = True
+    await sendLeaderBoard(ctx, players, channel, numOfGames)
+    
 
 
 #--------------------------------------------------------------------------------------------------------------#
 
-def parseMsgs(messages):
-
+def parseMsgs(messages, players):
+    players.clear()
+    numOfGames = dict()
+    scores = dict()
+    game = 0
     for msg in messages:
-        if "Wordle" in msg.content:
+        if "Wordle" in msg.content:           
             global scr
             scr = score(msg.content.partition('\n')[0].split(' ')[2])
             player = msg.author.name
+
             if player not in players:
                 players[player] = scr
+                numOfGames[player] = 1
             
             else:
                 current_score = players[player]
                 new_score = current_score + scr
                 players[player] = new_score
-            
-    print(players)
+                numOfGames[player] = numOfGames[player] + 1
+       
+    for player in players.keys():
+        players[player] = players[player]/numOfGames[player]
+    
+    return numOfGames
 
 
 def score(scr):
@@ -71,25 +82,25 @@ def score(scr):
     match scr:
     
         case "X/6":
-           score2 = 0
+           score2 = 7
         
         case "1/6":
-            score2 = 6
+            score2 = 1
 
         case "2/6":
-            score2 = 5
-
-        case "3/6":
-            score2 = 4
-
-        case "4/6":
-            score2 = 3
-
-        case "5/6":
             score2 = 2
 
+        case "3/6":
+            score2 = 3
+
+        case "4/6":
+            score2 = 4
+
+        case "5/6":
+            score2 = 5
+
         case "6/6":
-            score2 = 1
+            score2 = 6
 
     return score2
 
@@ -101,6 +112,20 @@ def update_table():
         dbManager.update(players)
     else:
         dbManager.update(players)
+
+async def sendLeaderBoard(ctx, players, channel, numOfGames):
+    embed = discord.Embed(
+        title = "Wordle Leaderboard")
+    i = 0
+    sortList = sorted(players.items(), key=lambda x:x[1])
+    players = dict(sortList)
+    for player in players:
+        i = i + 1
+        embed.add_field(name = "Rank " + str(i) + "           Score", value = player + """᲼᲼᲼᲼""" + str(players[player])[0:3], inline = False) 
+
+
+
+    await ctx.send(embed=embed)
 
 bot.run(TOKEN)
 
